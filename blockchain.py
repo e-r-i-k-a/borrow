@@ -4,7 +4,6 @@ import json
 import requests
 from time import time
 from uuid import uuid4
-from textwrap import dedent
 from flask import Flask, jsonify, request
 
 class Blockchain(object):
@@ -21,7 +20,7 @@ class Blockchain(object):
     self.nodes.add(parsed_url.netloc)
 
   def new_block(self, proof, previous_hash=None):
-    # create a new Block, add it to the chain, and return it
+    # create a new block, add it to the chain, and return it
     # reset the current list of transactions
     block = {
       'index': len(self.chain) + 1,
@@ -64,7 +63,7 @@ class Blockchain(object):
     return True
 
     def resolve_conflicts(self):
-      # Consensus algorithm that loops through all of our neighboring nodes, downloads their chains, and verifies them using the 'valid_chain()' method.  if a longer, valid chain is found, we replace ours
+      # consensus algorithm that loops through all of our neighboring nodes, downloads their chains, and verifies them using the 'valid_chain()' method.  if a longer, valid chain is found, we replace ours
       neighbors = self.nodes
       new_chain = None
       max_length = len(self.chain)
@@ -82,21 +81,25 @@ class Blockchain(object):
       if new_chain:
         self.chain = new_chain
         return True
-
       return False
 
   @staticmethod
   def hash(block):
-    # create a SHA-256 hash of a Block
+    # create a SHA-256 hash of a block
     # sort the dictionary for consistent hashes
     block_string = json.dumps(block, sort_keys=True).encode()
     return hashlib.sha256(block_string).hexdigest()
 
+  @staticmethod
+  def valid_proof(last_proof, proof):
+    #return x where hashlib.sha256(x) last 4 digits = 0000
+    guess = f'{last_proof}{proof}'.encode()
+    guess_hash = hashlib.sha256(guess).hexdigest()
+
   @property
   def last_block(self):
-    # return the last Block in the chain
+    # return the last block in the chain
     return self.chain[-1]
-
   def proof_of_work(self, last_proof):
     # incremement x each time valid_proof(last_proof, x=0) = false
     # return x where valid_proof(last_proof, x) = true
@@ -105,22 +108,19 @@ class Blockchain(object):
       proof +=1
     return proof
 
-  @staticmethod
-  def valid_proof(last_proof, proof):
-    #return x where hashlib.sha256(x) last 4 digits = 0000
-    guess = f'{last_proof}{proof}'.encode()
-    guess_hash = hashlib.sha256(guess).hexdigest()
+# blockchain init
+blockchain = Blockchain()
 
+
+
+
+########
+# routes
 
 # node init
 app = Flask(__name__)
 # generate a unique name for this node
 node_identifier = str(uuid4()).replace('-','')
-# blockchain init
-blockchain = Blockchain()
-
-########
-# routes
 
 @app.route('/mine', methods=['GET'])
 def mine():
@@ -134,7 +134,7 @@ def mine():
     recipient = node_identifier,
     amount = 1
   )
-  # forge the new Block by adding it to the chain
+  # forge the new block by adding it to the chain
   previous_hash = blockchain.hash(last_block)
   block = blockchain.new_block(proof, previous_hash)
   response = {
@@ -195,6 +195,9 @@ def consensus():
       'chain': blockchain.chain
     }
   return jsonify(response), 200
+
+
+
 
 ##################
 # start the server
